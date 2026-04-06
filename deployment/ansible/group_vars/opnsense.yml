@@ -1,0 +1,6 @@
+dhcp_range_uuid: "dd5c43a8-020d-4341-94cc-21993f56022f"
+lan_ip: "172.30.0.254"
+lan_prefix: "24"
+dhcp_start: "172.30.0.2"
+dhcp_end: "172.30.0.253"
+api_base: "https://{{ ansible_host }}/api"

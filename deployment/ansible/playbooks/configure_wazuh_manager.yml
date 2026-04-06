@@ -1,0 +1,122 @@
+---
+- name: configure_indexer
+  hosts: managers
+  gather_facts: false
+  become: true
+  vars_files:
+    - ../group_vars/wazuh.yml  
+
+  tasks:
+    - name: Deploy filebeat config
+      template:
+        src: ../files/filebeat.yml.j2
+        dest: /etc/filebeat/filebeat.yml
+        owner: root
+        group: wazuh
+        mode: '0600'
+
+    - name: Create Keystore
+      shell: filebeat keystore create --force
+
+    - name: set keystore admin user
+      shell: echo admin | filebeat keystore add username --stdin --force
+
+    - name: set keystore admin passwd
+      shell: echo admin | filebeat keystore add password --stdin --force
+
+    - name: Download Wazuh alerts template
+      get_url:
+        url: https://raw.githubusercontent.com/wazuh/wazuh/v4.14.4/extensions/elasticsearch/7.x/wazuh-template.json
+        dest: /etc/filebeat/wazuh-template.json
+        mode: '0644' 
+
+    - name: Install Wazuh Filebeat module
+      unarchive:
+        src: https://packages.wazuh.com/4.x/filebeat/wazuh-filebeat-0.5.tar.gz
+        dest: /usr/share/filebeat/module
+        remote_src: yes   
+
+    - name: Copy wazuh-certificates.tar to manager
+      copy:
+        src: /tmp/wazuh-certificates.tar
+        dest: /tmp/wazuh-certificates.tar
+
+    - name: Create filebeat certs directory
+      file:
+        path: /etc/filebeat/certs/
+        state: directory
+
+    - name: Extract node certs from tar
+      shell: >
+        tar -xf /tmp/wazuh-certificates.tar -C /etc/filebeat/certs/
+        {{ wazuh_indexer_name }}.pem
+        {{ wazuh_indexer_name }}-key.pem
+        root-ca.pem
+
+    - name: Rename node cert
+      command: >
+        mv /etc/filebeat/certs/{{ wazuh_indexer_name }}.pem
+        /etc/filebeat/certs/filebeat.pem
+      ignore_errors: true
+
+    - name: Rename node key
+      command: >
+        mv /etc/filebeat/certs/{{ wazuh_indexer_name }}-key.pem
+        /etc/filebeat/certs/filebeat-key.pem
+      ignore_errors: true
+
+    - name: Set certs ownership
+      file:
+        path: /etc/filebeat/certs/
+        owner: root
+        group: root
+        recurse: true
+
+    - name: Set cert file permissions
+      file:
+        path: /etc/filebeat/certs/
+        mode: '0400'
+        recurse: true
+
+    - name: Set certs directory permissions
+      file:
+        path: /etc/filebeat/certs/
+        mode: '0500'
+
+    - name: set ossec admin user
+      shell: echo admin | /var/ossec/bin/wazuh-keystore -f indexer -k username
+
+    - name: set ossec admin passwd
+      shell: echo admin | /var/ossec/bin/wazuh-keystore -f indexer -k password
+
+    - name: Insert ossec config
+      template:
+        src: ../files/ossec.conf.j2
+        dest: /var/ossec/etc/ossec.conf
+        owner: root
+        group: wazuh
+        mode: '0660'
+
+    - name: Reload systemd daemon
+      systemd:
+        daemon_reload: true
+
+    - name: Enable and start wazuh-manager
+      systemd:
+        name: wazuh-manager
+        enabled: true
+        state: started
+
+    - name: Enable and start filebeat
+      systemd:
+        name: filebeat
+        enabled: true
+        state: started
+    
+    - name: test filebeat
+      shell: filebeat test output
+      register: filebeat_test
+
+    - name: Show filebeat test
+      debug:
+        var: filebeat_test.stdout_lines

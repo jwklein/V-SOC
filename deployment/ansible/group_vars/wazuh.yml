@@ -1,0 +1,15 @@
+wazuh_indexer_ip: "172.30.0.10"
+wazuh_manager_ip: "172.30.0.10"
+wazuh_dashboard_ip: "172.17.0.238"
+
+wazuh_indexer_name: "indexer"
+wazuh_manager_name: "manager"
+wazuh_dashboard_name: "dashboard"
+
+wazuh_cluster_name: "cyb-siem"
+wazuh_cluster_key: ""
+
+ansible_become_method: sudo
+ansible_become_user: root
+
+opnsense_wan_ip: "172.17.0.228"
