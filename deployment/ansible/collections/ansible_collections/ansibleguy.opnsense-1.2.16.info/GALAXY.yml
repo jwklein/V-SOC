@@ -1,0 +1,8 @@
+download_url: https://galaxy.ansible.com/api/v3/plugin/ansible/content/published/collections/artifacts/ansibleguy-opnsense-1.2.16.tar.gz
+format_version: 1.0.0
+name: opnsense
+namespace: ansibleguy
+server: https://galaxy.ansible.com/api/
+signatures: []
+version: 1.2.16
+version_url: /api/v3/plugin/ansible/content/published/collections/index/ansibleguy/opnsense/versions/1.2.16/

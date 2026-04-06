@@ -1,0 +1,98 @@
+---
+- name: configure_indexer
+  hosts: dashboards
+  gather_facts: false
+  become: true
+  vars_files:
+    - ../group_vars/wazuh.yml  
+
+  tasks:
+    - name: insert opensearch config
+      template:
+        src: ../files/opensearch_dashboards.yml.j2
+        dest: /etc/wazuh-dashboard/opensearch_dashboards.yml
+        owner: wazuh-dashboard
+        group: wazuh-dashboard
+        mode: '0640'
+    
+    - name: Add persistent route to wazuh network
+      ansible.builtin.template:
+        src: ../files/netplan-route.yaml.j2
+        dest: /etc/netplan/60-wazuh-route.yaml
+        mode: '0600'
+    
+    - name: Apply netplan
+      command: netplan apply
+
+    - name: Copy wazuh-certificates.tar to dashboard
+      copy:
+        src: /tmp/wazuh-certificates.tar
+        dest: /tmp/wazuh-certificates.tar
+    
+    - name: Create wazuh-dashboard certs directory
+      file:
+        path: /etc/wazuh-dashboard/certs/
+        state: directory
+
+    - name: Extract node certs from tar
+      shell: >
+        tar -xf /tmp/wazuh-certificates.tar -C /etc/wazuh-dashboard/certs/
+        {{ wazuh_indexer_name }}.pem
+        {{ wazuh_indexer_name }}-key.pem
+        root-ca.pem
+
+    - name: Rename node cert
+      command: >
+        mv /etc/wazuh-dashboard/certs/{{ wazuh_indexer_name }}.pem
+        /etc/wazuh-dashboard/certs/dashboard.pem
+      ignore_errors: true
+
+    - name: Rename node key
+      command: >
+        mv /etc/wazuh-dashboard/certs/{{ wazuh_indexer_name }}-key.pem
+        /etc/wazuh-dashboard/certs/dashboard-key.pem
+      ignore_errors: true
+
+    - name: Set certs ownership
+      file:
+        path: /etc/wazuh-dashboard/certs
+        owner: wazuh-dashboard
+        group: wazuh-dashboard
+        recurse: true
+
+    - name: Set cert file permissions
+      file:
+        path: /etc/filebeat/certs/
+        mode: '0400'
+        recurse: true
+
+    - name: Set certs directory permissions
+      file:
+        path: /etc/filebeat/certs/
+        mode: '0500'
+
+    - name: Reload systemd daemon
+      systemd:
+        daemon_reload: true
+
+    - name: Enable and start wazuh-dashboard
+      systemd:
+        name: wazuh-dashboard
+        enabled: true
+        state: started
+    
+    - name: Create wazuh dashboard config directory
+      file:
+        path: /usr/share/wazuh-dashboard/data/wazuh/config
+        state: directory
+        owner: wazuh-dashboard
+        group: wazuh-dashboard
+        mode: '0750'
+
+    - name: Deploy wazuh dash config
+      template:
+        src: ../files/wazuh.yml.j2
+        dest:  /usr/share/wazuh-dashboard/data/wazuh/config/wazuh.yml
+        owner: wazuh-dashboard
+        group: wazuh-dashboard
+        mode: '0640'

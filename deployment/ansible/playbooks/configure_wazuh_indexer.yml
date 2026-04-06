@@ -1,0 +1,84 @@
+---
+- name: configure_indexer
+  hosts: indexers
+  gather_facts: false
+  become: true
+  vars_files:
+    - ../group_vars/wazuh.yml  
+
+  tasks:
+  # ── 1. INDEXER: Deploy certs and opensearch config ─────────────────────────────────────────
+    - name: Deploy opensearch.yml
+      template:
+        src: ../files/opensearch.yml.j2
+        dest: /etc/wazuh-indexer/opensearch.yml
+        owner: wazuh-indexer
+        group: wazuh-indexer
+        mode: '0660'
+
+    - name: Create wazuh-indexer certs directory
+      file:
+        path: /etc/wazuh-indexer/certs
+        state: directory
+      
+    - name: Copy wazuh-certificates.tar to indexer
+      copy:
+        src: /tmp/wazuh-certificates.tar
+        dest: /tmp/wazuh-certificates.tar
+
+    - name: Extract node certs from tar
+      shell: >
+        tar -xf /tmp/wazuh-certificates.tar -C /etc/wazuh-indexer/certs/
+        {{ wazuh_indexer_name }}.pem
+        {{ wazuh_indexer_name }}-key.pem
+        admin.pem
+        admin-key.pem
+        root-ca.pem
+
+    - name: Rename node cert
+      command: >
+        mv /etc/wazuh-indexer/certs/{{ wazuh_indexer_name }}.pem
+        /etc/wazuh-indexer/certs/indexer.pem
+      ignore_errors: true
+
+    - name: Rename node key
+      command: >
+        mv /etc/wazuh-indexer/certs/{{ wazuh_indexer_name }}-key.pem
+        /etc/wazuh-indexer/certs/indexer-key.pem
+      ignore_errors: true
+
+    - name: Set certs ownership
+      file:
+        path: /etc/wazuh-indexer/certs
+        owner: wazuh-indexer
+        group: wazuh-indexer
+        recurse: true
+
+    - name: Set cert file permissions
+      file:
+        path: /etc/wazuh-indexer/certs
+        mode: '0400'
+        recurse: true
+
+    - name: Set certs directory permissions
+      file:
+        path: /etc/wazuh-indexer/certs
+        mode: '0500'
+  # ── 2. daemon reload && start wazuh-indexer ─────────────────────────────────────────
+    - name: Reload systemd daemon
+      systemd:
+        daemon_reload: true
+
+    - name: Enable and start wazuh-indexer
+      systemd:
+        name: wazuh-indexer
+        enabled: true
+        state: started
+  # ── 3. run cluster init ─────────────────────────────────────────
+    - name: exec cluster init
+      shell: bash /usr/share/wazuh-indexer/bin/indexer-security-init.sh
+      register: sec_init_result
+
+    - name: Show cluster init output
+      debug:
+        var: sec_init_result.stdout_lines

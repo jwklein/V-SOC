@@ -1,0 +1,51 @@
+# --- Terraform state (VERY IMPORTANT: contains secrets) ---
+*.tfstate*
+*.tfstate.*
+crash.log
+
+# --- Terraform variables (often contain secrets) ---
+terraform.tfvars
+terraform.tfvars.json
+*.tfvars
+*.tfvars.json
+*.bak
+*.pem
+*tfschema*
+
+
+# --- Ansible ---
+*ansibleapi*
+*.xml*
+*vault*
+*.tar*
+# --- Galaxy Packages
+deployment/ansible/collections/ansible_collections/ansibleguy
+
+# --- Override files (local-only tweaks) ---
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# --- Terraform CLI config files ---
+.terraformrc
+terraform.rc
+
+# -- keyfiles -- #
+*.pem
+
+# --- Terraform working directory ---
+.terraform/
+deployment/terraform/.terraform/providers
+# --- Plan files (can contain sensitive data) ---
+*.tfplan
+*.plan
+
+# --- Sensitive environment files ---
+.env
+.env.*
+
+# --- macOS / Linux junk ---
+.DS_Store
+*.swp
+*.swo

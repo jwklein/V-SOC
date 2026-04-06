@@ -1,0 +1,50 @@
+---
+- name: Generate certs tarball
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - ../group_vars/wazuh.yml
+
+
+  # ── 1. Generate certs ─────────────────────────────────────────
+  tasks:
+    - name: Load config.yml template
+      template:
+        src: ../files/config.yml.j2
+        dest: /tmp/config.yml
+
+    - name: Copy wazuh-certs-tool.sh
+      copy:
+        src: ../files/wazuh-certs-tool.sh
+        dest: /tmp/wazuh-certs-tool.sh
+        mode: '0755'
+
+    - name: Remove existing wazuh-certificates artifacts
+      file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/wazuh-certificates
+        - /tmp/wazuh-certificates.tar
+
+    - name: Generate Wazuh certificates
+      shell: bash /tmp/wazuh-certs-tool.sh -A
+      args:
+        chdir: /tmp
+      register: cert_gen_result
+
+    - name: Show cert generation output
+      debug:
+        var: cert_gen_result.stdout_lines
+
+    - name: Archive wazuh-certificates directory
+      archive:
+        path: /tmp/wazuh-certificates/
+        dest: /tmp/wazuh-certificates.tar
+        format: tar
+    
+    - name : clean up the certs directory
+      file:
+        path: /tmp/wazuh-certificates
+        state: absent

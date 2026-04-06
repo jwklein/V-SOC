@@ -1,0 +1,7 @@
+network:
+  ethernets:
+    eth0:
+      routes:
+        - to: 172.30.0.0/24
+          via: {{opnsense_wan_ip}}
+  version: 2

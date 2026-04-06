@@ -1,0 +1,82 @@
+---
+- name: Configure OPNsense LAN
+  hosts: opnsense
+  gather_facts: false
+
+  vars_files:
+    - ../group_vars/opnsense_vault.yml
+    - ../group_vars/opnsense.yml
+  tasks:
+    # ── 1. Pull current config ─────────────────────────────────────────
+    - name: Download current config XML
+      uri:
+        url: "{{ api_base }}/core/backup/download/this"
+        method: GET
+        return_content: true
+        user: "{{ api_key }}"
+        password: "{{ api_secret }}"
+        force_basic_auth: true
+        validate_certs: false
+      register: config_dl
+
+    - name: Save config locally for manipulation
+      copy:
+        content: "{{ config_dl.content }}"
+        dest: /tmp/opnsense_config.xml
+      delegate_to: localhost
+
+    # ── 2. Patch LAN IP in XML ─────────────────────────────────────────
+    - name: Set LAN ipaddr
+      xml:
+        path: /tmp/opnsense_config.xml
+        xpath: /opnsense/interfaces/lan/ipaddr
+        value: "{{ lan_ip }}"
+      delegate_to: localhost
+
+    - name: Set LAN subnet prefix
+      xml:
+        path: /tmp/opnsense_config.xml
+        xpath: /opnsense/interfaces/lan/subnet
+        value: "{{ lan_prefix }}"
+      delegate_to: localhost
+
+    - name: Ensure LAN type is static
+      xml:
+        path: /tmp/opnsense_config.xml
+        xpath: /opnsense/interfaces/lan/type
+        value: "staticv4"
+      delegate_to: localhost
+
+    - name: Set dnsmasq DHCP range start
+      xml:
+        path: /tmp/opnsense_config.xml
+        xpath: /opnsense/dnsmasq/dhcp_ranges[@uuid='{{ dhcp_range_uuid }}']/start_addr
+        value: "{{ dhcp_start }}"
+      delegate_to: localhost
+
+    - name: Set dnsmasq DHCP range end
+      xml:
+        path: /tmp/opnsense_config.xml
+        xpath: /opnsense/dnsmasq/dhcp_ranges[@uuid='{{ dhcp_range_uuid }}']/end_addr
+        value: "{{ dhcp_end }}"
+      delegate_to: localhost
+
+    - name: Scp push xml
+      copy:
+        src: /tmp/opnsense_config.xml
+        dest: /conf/config.xml
+        owner: root
+        group: wheel
+        mode: '660'
+
+    # ── 4. Reconfigure LAN interface ───────────────────────────────────
+    - name: Reconfigure LAN interface
+      uri:
+        url: "{{ api_base }}/interfaces/overview/reload_interface/lan"
+        method: GET
+        user: "{{ api_key }}"
+        password: "{{ api_secret }}"
+        force_basic_auth: true
+        validate_certs: false
+      # connection will drop here if managing via LAN — expected
+      ignore_errors: true
