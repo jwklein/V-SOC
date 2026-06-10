@@ -1,5 +1,5 @@
 variable "proxmox_api_token" {
-  description = "Proxmox API token in format kleinjw@miamildap!tokenid=secret"
+  description = "Proxmox API token in format user@miamildap!tokenid=secret"
   sensitive   = true
 }
 variable "proxmox_ssh_keypath" {
