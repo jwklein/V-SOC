@@ -1,4 +1,10 @@
-# Overview
+# V-SOC
+
+V-SOC is an infrastructure-as-code platform that deploys a complete, ephemeral SOC lab environment — SIEM, firewall, honeypot, victims, kali and a pentest GPT box — on Proxmox (QEMU/KVM) in about 7 minutes, and tears it down in less. It's built for hands-on red team / blue team security education: an instructor provisions a fresh, isolated environment per lesson, assigns offensive and defensive roles to students, and destroys it afterward to free cluster resources.
+
+Designed around Miami University's virtualization cluster, V-SOC uses golden images and a single-command Terraform + Ansible pipeline, so the entire lab — network segmentation, SIEM stack, detection rules, and agents — comes up configured and ready rather than requiring manual setup.
+
+## Architecture
 ```mermaid
 ---
 config:
@@ -23,6 +29,7 @@ flowchart TB
         opnsensedownstream["opnsense<br>(LAN NIC)"]
         wazuhmanager["wazuh manager-indexer"]
         kaluran["kali-lan"]
+        pentest["pentest-gpt"]
         metasploitable3_grp
         cowrie_grp
   end
@@ -36,6 +43,7 @@ flowchart TB
      opnsenseupstream:::firewall
      metasploitable3win:::host
      wazuhagent1:::agent
+     pentest:::host
      cowrie:::host
      wazuhagent2:::agent
      opnsensedownstream:::firewall
@@ -50,9 +58,83 @@ flowchart TB
     classDef host fill:#f0f9ff,stroke:#38bdf8
     classDef agent fill:#fefce8,stroke:#facc15
 ```
+The environment is split across two bridges: an upstream segment (vmbr0) holding the management plane and external attacker, and a downstream lab segment (vmbr10) behind an OPNsense firewall containing the victims, honeypot, and internal attacker. The OPNsense instance routes and filters between them, giving a realistic network boundary for exercises. The beginning of the management domain is the IaC controller and flows downstream.
 
+## Capabilities
+V-SOC uses a combination of Wazuh agents, Suricata IDS, and Cowrie honeypots to detect malicious activity. Telemetry is communicated to the indexer using syslog and displayed in wazuh dashboards. See below for a dashboard reporting from a ssh-login dictionary attack.
 
-# Dependencies
+![Wazuh dashboard showing correlated alerts](documents/images/wazuh-dash.png)
 
-This project was designed around a specific proxmox environment for Miami University. Therefore the repository assumes a set of Golden-Image Dependencies necessary for deployment, and a set of secrets within the host machine running deployment that are not included in the repo. All of which will be enumerated and explained.
+#### OPNsense & Suricata
+Is the only bridge between vmbr0 and vmbr10. All traffic passing through the LAN, or within vmbr10 is monitored by Suricata, which runs on OPNsense. Suricata inspects lab traffic and forwards EVE JSON events into Wazuh, correlating network-layer detections with host events.
 
+#### Cowrie
+Runs a ssh-honeypot to capture attacker behavior as displayed above.
+
+#### Wazuh Agents
+Fully-functional agents are implemented with capabilities such as data collection, file integrity monitoring, threat detection, security configuration assessment, system inventory, vulnerability detection, and incident response. V-SOC uses the default configuration of the agents. In our attack demo we use runbook we use the agents to detect an eternal blue ransomware attack.
+
+## Deployment Workflow
+For deployment, this repo is meant to be cloned into the IaC controller, and the script deployment/shell/deploy.sh is to be run. Deployment is orchestrated between Terraform and Ansible between bootstrapping and main stages.
+
+#### Bootstrap Stage
+Terraform files at deployment/terraform/network-init/{network_resources.tf, opnsense.tf} are run to provision the LAN bridge and clone the firewall to a bootstrap wan IP. Then Ansible is used to configure opnsense.
+
+#### Main Stage
+Terraform is run from the deployment/terraform/main directory to provision clones for all other instances. Then, Ansible is run to make all necessary configurations of theses instances. Wazuh agent enrollment marks the end of deplpyment.
+
+## Repository Structure
+See a simplified representation of our functional directory tree.
+```
+├── deployment/
+│   ├── terraform/          # Phase 1: provisioning (bpg provider)
+│   │   ├── network-init/   #   OPNsense + bridges, applied first
+│   │   └── main/           #   victim/attacker/Wazuh VMs from golden images
+│   ├── ansible/            # Phase 2: configuration
+│   │   ├── playbooks/      #   Wazuh manager/indexer/dashboard, OPNsense LAN
+│   │   ├── files/          #   Jinja2 templates (ossec, filebeat, opensearch…)
+│   │   └── group_vars/     #   per-host + shared variables
+│   └── shell/              # Deploy/destroy wrapper orchestrating both phases
+├── attack-scripts/         # Red-team runbook driving the demo scenario
+├── documents/
+│   ├── manual-ops-guide/   # Standalone deployment + SIEM/EDR PDFs
+│   └── images/
+└── README.md
+```
+
+## Environment & Dependencies
+
+V-SOC is designed for a specific Proxmox environment and is not a turnkey deploy on arbitrary hardware. It assumes:
+
+- A **Proxmox Cluster** with the unmanaged upstream bridge (`vmbr0`) already present.
+- A set of **secrets files** obfuscated with either symlinks or gitignore.
+- The **IaC Controller** created out-of-band and runs the pipeline and possesses the secret files.
+- A set of **Golden Images** as proxmox templates
+
+| Component | Base OS | Segment | IP assignment | Cloud-init | Role |
+|---|---|---|---|---|---|
+| `ansible-terraform-lxc` | Ubuntu 25.04 (LXC) | WAN | Manual | No | IaC controller — Terraform/Ansible orchestration |
+| `opnsense-swan` | FreeBSD | WAN + LAN | Static — bootstrap `x.x.x.228`, then user-set | No | Firewall, DHCP server, IDS platform |
+| `wazuh-dashboard` | Ubuntu 25.10 | WAN | Static | Yes | Wazuh dashboard / management console |
+| `wazuh-indx-mngr` | Ubuntu 25.10 | LAN | Static | Yes | Wazuh indexer + manager |
+| `ms3-win2k8` | Metasploitable3 Win2k8 (Rapid7) | LAN | DHCP | No | Vulnerable target (Wazuh agent installed) |
+| `cowrie` | Ubuntu 25.10 | LAN | Static | Yes | SSH honeypot |
+| `kali-wan` | Kali Linux | WAN | Static | Yes | Red-team platform (external) |
+| `kali-lan` | Kali Linux | LAN | Static | Yes | Red-team platform (internal) |
+| `pentest-gpt` | Ubuntu 25.10 | LAN | Static | Yes | Red-team agentic platform (internal)|
+
+All VMs other than the lxc are part of the managed pipeline. In order to migrate to another cluster, one would need to migrate the related Golden Images. Then, api keys, ansible_vars.yml, terraform.tfvars, ssh keyfiles, and an ssh config matching the ansible inventory would need to be created. Furthermore, this should include a proxmox vault, and pentest gpt vault to be made, including new api keys.
+
+## Documentation
+- **Design approach, decisions, attributes**
+    - Documents/design-choices.md
+- **Manual Deployment procedure in command format**
+    - Documents/manual-deployment.md
+## Limitations
+One difficulty of this project was that we migrated platforms from openstack to proxmox half way through the year. As such we have a few limitations.
+
+- **Wazuh Dashboards**
+    - We have a Cowrie Dashboard, and a General Student Dashboard for IDS and EDR. However, these could use some polishing under the eve json syslog indexing scheme we ended up implementing.
+- **Metasploitable** is very difficult to work with in a virtualized environment on account of being so old. For example, they do not accept qemu agents, and getting network connectivity and wazuh agents installed was a hack.
+    - **Win2k8** Sometimes needs a manual opening of it's desktop interface from the proxmox console before sending a DHCP Discover (recieving a ip address from opnsense). This must be done before it's wazuh agent is enrolled to the server.
+    - **Trusty** We were not able to get the trusty ms3 cloudimage to get proper network connectivity via dhcp, especially since it was low priority. Windows is generally the preferred target for metasploitable3.
