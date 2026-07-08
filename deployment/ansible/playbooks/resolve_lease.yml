@@ -1,0 +1,69 @@
+---
+# deployment/ansible/playbooks/resolve_lease.yml
+#
+# Resolve a DHCP lease IP from the OPNsense dnsmasq lease table by MAC address.
+# Consumes the exported $MAC env var (like deploy.sh consumes $VAULT_PASS):
+#
+#   export MAC='08:00:27:aa:bb:cc'
+#   ansible-playbook playbooks/lookup_lease_ip.yml
+#
+# Sets the `matched_ip` fact for downstream use (e.g. agent enrollment).
+
+- name: Resolve DHCP lease IP by MAC
+  hosts: localhost
+  gather_facts: false
+
+  vars:
+    opnsense_url: "https://172.17.0.228"
+    opnsense_api_key: "{{ vault_opnsense_api_key }}"       # from the vaulted group_vars
+    opnsense_api_secret: "{{ vault_opnsense_api_secret }}"
+    target_mac: "{{ lookup('env', 'MAC') }}"              # or override with -e mac=...
+    # Field names in the dnsmasq lease schema — verify against a raw response
+    # (run with -v to dump the first row) and adjust if they differ:
+    mac_field: "hwaddr"
+    ip_field: "address"
+
+  tasks:
+    - name: Fail early if no MAC was provided
+      ansible.builtin.fail:
+        msg: "No MAC address. Export MAC or pass -e mac=<addr>."
+      when: target_mac | length == 0
+
+    - name: Query dnsmasq leases
+      ansible.builtin.uri:
+        url: "{{ opnsense_url }}/api/dnsmasq/leases/search"
+        method: POST
+        url_username: "{{ opnsense_api_key }}"
+        url_password: "{{ opnsense_api_secret }}"
+        force_basic_auth: true
+        validate_certs: false          # internal self-signed cert; see note below
+        body_format: json
+        body:
+          current: 1
+          rowCount: -1                 # -1 = all rows, avoids pagination
+          searchPhrase: ""
+        return_content: true
+      register: lease_result
+
+    - name: (verify) dump first lease row to confirm field names
+      ansible.builtin.debug:
+        var: lease_result.json.rows[0]
+        verbosity: 1
+
+    - name: Match the lease for the target MAC (case-insensitive)
+      ansible.builtin.set_fact:
+        matched_ip: >-
+          {{ lease_result.json.rows
+             | selectattr(mac_field, 'defined')
+             | selectattr(mac_field, 'match', '(?i)^' ~ (target_mac | trim) ~ '$')
+             | map(attribute=ip_field)
+             | list | first | default('') }}
+
+    - name: Fail if no lease found for MAC
+      ansible.builtin.fail:
+        msg: "No dnsmasq lease found for MAC {{ target_mac }}"
+      when: matched_ip | length == 0
+
+    - name: Show resolved IP
+      ansible.builtin.debug:
+        msg: "{{ target_mac }} -> {{ matched_ip }}"
