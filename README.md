@@ -74,6 +74,38 @@ Runs a SSH-honeypot to capture attacker behavior as displayed above.
 #### Wazuh Agents
 Fully-functional agents are implemented with capabilities such as data collection, file integrity monitoring, threat detection, security configuration assessment, system inventory, vulnerability detection, and incident response. V-SOC puts agents in the default group. attacks/soc_demo_runbook.docx describes a WannaCry style ransomware attack via the EternalBlue exploit, which the agents reported.
 
+## Teaching Use Cases
+
+V-SOC ships as infrastructure with sane-default, largely unconfigured tooling —
+not a fixed lesson. The detection stack comes up functional but untuned, which
+is deliberate: the blank slate *is* the coursework. This lets one platform
+support a wide span of activity and skill levels, from a first-day
+demonstration to capstone-level detection engineering.
+
+Lesson-plan specific snapshots can be taken of the base golden images and IaC code,
+then organized into versions on an as-needed basis.
+
+**Instructor-led demonstration.** The instructor runs the full attack pipeline
+from a Kali box while students watch it surface across the defensive outputs —
+Suricata network events and Wazuh host alerts appearing in the dashboards in
+real time. This is the "here's what an intrusion looks like from both ends at
+once" lesson, and the lowest-setup way to make the red-and-blue relationship
+legible.
+
+**Role-assigned exercises.** Students take defined roles — offense from the
+Kali platforms, defense reading alerts and triaging in Wazuh — and run against
+the instructor, against each other, or against a scripted scenario. Because
+each environment is isolated and ephemeral, groups can work in parallel or
+reset a scenario cleanly between rounds.
+
+**Detection engineering.** The deepest tier: students configure the tools
+rather than just operate them — authoring and tuning Wazuh rules, adjusting
+Suricata signatures, and building out the dashboards from the default state.
+The reflexive version closes the loop: red-side students engineer an attack
+pipeline against the defensive telemetry they can observe, iterating to evade
+or deliberately trigger specific detections, while blue-side students tune
+rules to catch them. Attack and detection co-evolve on the same platform.
+
 ## Deployment Workflow
 For deployment, this repo is meant to be cloned into the IaC controller, and the script deployment/shell/deploy.sh is to be run. Deployment is orchestrated between Terraform and Ansible between bootstrapping and main stages.
 
@@ -165,11 +197,20 @@ Host prox_cowrie
     - documents/design-choices.md
 - **Manual Deployment procedure in command format**
     - documents/manual-deployment.md
-## Limitations
+## Limitations & Notes
 One difficulty of this project was that we migrated platforms from Openstack to Proxmox half way through the year. As such we have a few limitations.
+
+- **Upstream DHCP**
+  - vmbr0 was deliberately left as an unmanaged dependency of the project for better encapsulation. However, 
+  because it is unmanaged, the dhcp server responsible for vmbr0 should be configured to exclude x.x.x.228(the bootstrap ip of the opnsense template)
+  - the opnsense template can be reconfigured to any new static ip then retemplated for a new environment
+
+- **Scale**
+  - Right now deploy.sh wraps the deployment of a single network topology, as aligned with our project requirements and roadmap. However, a further encapsulating program can be created to generate several adjacent V-SOC topologies originating from vmbr0. Accepting a list of topology names whitespace separated, generating and proliferating associated subnets and ip addresses, and exporting documentation for the various generated topologies.  This should be more convenient for a groups-allocated-topology lesson plan.
 
 - **Wazuh Dashboards**
   - We have a Cowrie Dashboard, and a General Student Dashboard for IDS and EDR. However, they could use some polishing under the eve json syslog indexing scheme we ended up implementing.
+
 - **Metasploitable** is very difficult to work with in a virtualized environment on account of being so old. For example, they do not accept qemu agents, and getting network connectivity and Wazuh agents installed was a hack.
   - **Win2k8** Sometimes needs a manual opening of its desktop interface from the Proxmox console before sending a DHCP Discover (requesting a ip address from OPNsense). This must be done before its Wazuh agent is enrolled to the server.
   - **Trusty** We were not able to get the trusty ms3 cloudimage to get proper network connectivity via dhcp, especially since it was low priority. Windows is generally the preferred target for metasploitable3.
