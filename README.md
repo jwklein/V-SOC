@@ -1,8 +1,8 @@
 # V-SOC
 
-V-SOC is an infrastructure-as-code platform that deploys a complete, ephemeral SOC lab environment — SIEM, firewall, honeypot, victims, Kali and a pentest gpt box — on Proxmox (QEMU/KVM) in ~8 minutes, and tears it down in less. It's built for hands-on red team / blue team security education: an instructor provisions a fresh, isolated environment per lesson, assigns offensive and defensive roles to students, and destroys it afterward to free cluster resources.
+V-SOC is an infrastructure-as-code platform that deploys a complete, ephemeral SOC lab environment — SIEM, firewall, honeypot, victims, Kali and a pentest gpt box on Proxmox (QEMU/KVM) in ~8 minutes, and tears it down in less. It's built for hands-on red team / blue team security education: an instructor provisions a fresh, isolated environment per lesson, assigns offensive and defensive roles to students, and destroys it afterward to free cluster resources.
 
-Designed around Miami University's virtualization cluster, V-SOC uses golden images and a single-command Terraform + Ansible pipeline, so the entire lab — network segmentation, SIEM stack, Wazuh & Suricata detection rulesets, and agents — comes up configured and ready rather than requiring manual setup.
+Designed around Miami University's virtualization cluster, V-SOC uses golden images and a single-command Terraform + Ansible pipeline, so the entire lab, network segmentation, SIEM stack, Wazuh & Suricata detection rulesets, and agents come up configured and ready rather than requiring manual setup.
 
 ## Architecture
 ```mermaid
@@ -76,7 +76,7 @@ Fully-functional agents are implemented with capabilities such as data collectio
 
 ## Teaching Use Cases
 
-V-SOC ships as infrastructure with sane-default, largely unconfigured tooling —
+V-SOC ships as infrastructure with sane-default, largely unconfigured tooling and
 not a fixed lesson. The detection stack comes up functional but untuned, which
 is deliberate: the blank slate *is* the coursework. This lets one platform
 support a wide span of activity and skill levels, from a first-day
@@ -86,20 +86,20 @@ Lesson-plan specific snapshots can be taken of the base golden images and IaC co
 then organized into versions on an as-needed basis.
 
 **Instructor-led demonstration.** The instructor runs the full attack pipeline
-from a Kali box while students watch it surface across the defensive outputs —
+from a Kali box while students watch it surface across the defensive outputs:
 Suricata network events and Wazuh host alerts appearing in the dashboards in
 real time. This is the "here's what an intrusion looks like from both ends at
 once" lesson, and the lowest-setup way to make the red-and-blue relationship
 legible.
 
-**Role-assigned exercises.** Students take defined roles — offense from the
-Kali platforms, defense reading alerts and triaging in Wazuh — and run against
+**Role-assigned exercises.** Students take defined roles. Offense from the
+Kali platforms, defense reading alerts and triaging in Wazuh; run against
 the instructor, against each other, or against a scripted scenario. Because
 each environment is isolated and ephemeral, groups can work in parallel or
 reset a scenario cleanly between rounds.
 
 **Detection engineering.** The deepest tier: students configure the tools
-rather than just operate them — authoring and tuning Wazuh rules, adjusting
+rather than just operate them: authoring and tuning Wazuh rules, adjusting
 Suricata signatures, and building out the dashboards from the default state.
 The reflexive version closes the loop: red-side students engineer an attack
 pipeline against the defensive telemetry they can observe, iterating to evade
@@ -145,8 +145,8 @@ V-SOC is designed for a specific Proxmox environment and is not a turnkey deploy
 
 | Component | Base OS | Segment | IP assignment | Cloud-init | Role |
 |---|---|---|---|---|---|
-| ansible-terraform-lxc | Ubuntu 25.04 (LXC) | WAN | Manual | No | IaC controller — Terraform/Ansible orchestration |
-| OPNsense-swan | FreeBSD | WAN + LAN | Static — bootstrap `x.x.x.228`, then user-set | No | Firewall, DHCP server, IDS platform |
+| ansible-terraform-lxc | Ubuntu 25.04 (LXC) | WAN | Manual | No | IaC controller (Terraform/Ansible orchestration) |
+| OPNsense-swan | FreeBSD | WAN + LAN | Static bootstrap `x.x.x.228`, then user-set | No | Firewall, DHCP server, IDS platform |
 | Wazuh-dashboard | Ubuntu 25.10 | WAN | Static | Yes | Wazuh dashboard / management console |
 | Wazuh-indx-mngr | Ubuntu 25.10 | LAN | Static | Yes | Wazuh indexer + manager |
 | ms3-win2k8 | Metasploitable3 Win2k8 (Rapid7) | LAN | DHCP | No | Vulnerable target (Wazuh agent installed) |
@@ -181,12 +181,14 @@ Host prox_dash
 Host prox_pentest
   HostName ip
   User u
+  ProxyJump prox_fw
   IdentityFile ~/.ssh/id_ed25519
   IdentitiesOnly yes
 
 Host prox_cowrie
   HostName ip
   User u
+  ProxyJump prox_fw
   IdentityFile ~/.ssh/id_ed25519
   IdentitiesOnly yes
 ```
