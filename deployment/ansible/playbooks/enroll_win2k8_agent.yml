@@ -19,13 +19,14 @@
 - name: Register Win2k8 victim
   hosts: localhost
   gather_facts: false
+
   tasks:
     - name: Add victim to inventory with SSH connection vars
       ansible.builtin.add_host:
         name: win2k8_victim
         groups: victims
         ansible_host: "{{ matched_ip }}"     # from the lease lookup above
-        ansible_connection: ssh
+        ansible_connection: ssh              # rapid7 ms3 image should feature ssh
         ansible_user: vagrant                # Metasploitable3 default creds
         ansible_password: vagrant            # needs sshpass on the controller
         # Ephemeral victims are re-cloned each deploy, so host keys change —
@@ -36,12 +37,12 @@
 - name: Enroll Wazuh agent on Win2k8 victim
   hosts: victims
   gather_facts: false
-  vars:
-    wazuh_manager_ip: "{{ manager_ip }}"                       # match your vars file
-    wazuh_msi_path: 'C:\vagrant\wazuh-agent-4.14.6-1.msi'      # baked-in path — adjust
+  vars_files:
+    - ../group_vars/wazuh.yml  
+  
   tasks:
     - name: Install the agent silently, pointed at the manager
-      ansible.builtin.raw: msiexec.exe /i {{ wazuh_msi_path }} /q WAZUH_MANAGER={{ wazuh_manager_ip }}
+      ansible.builtin.raw: msiexec.exe /i wazuh-agent-4.14.6-1.msi /q WAZUH_MANAGER={{ wazuh_manager_ip }}
 
     - name: Start the Wazuh service
       ansible.builtin.raw: net start WazuhSvc

@@ -169,7 +169,7 @@ Host prox_cowrie
 One difficulty of this project was that we migrated platforms from Openstack to Proxmox half way through the year. As such we have a few limitations.
 
 - **Wazuh Dashboards**
-    - We have a Cowrie Dashboard, and a General Student Dashboard for IDS and EDR. However, they could use some polishing under the eve json syslog indexing scheme we ended up implementing.
+  - We have a Cowrie Dashboard, and a General Student Dashboard for IDS and EDR. However, they could use some polishing under the eve json syslog indexing scheme we ended up implementing.
 - **Metasploitable** is very difficult to work with in a virtualized environment on account of being so old. For example, they do not accept qemu agents, and getting network connectivity and Wazuh agents installed was a hack.
-    - **Win2k8** Sometimes needs a manual opening of its desktop interface from the Proxmox console before sending a DHCP Discover (requesting a ip address from OPNsense). This must be done before its Wazuh agent is enrolled to the server.
-    - **Trusty** We were not able to get the trusty ms3 cloudimage to get proper network connectivity via dhcp, especially since it was low priority. Windows is generally the preferred target for metasploitable3.
+  - **Win2k8** Sometimes needs a manual opening of its desktop interface from the Proxmox console before sending a DHCP Discover (requesting a ip address from OPNsense). This must be done before its Wazuh agent is enrolled to the server.
+  - **Trusty** We were not able to get the trusty ms3 cloudimage to get proper network connectivity via dhcp, especially since it was low priority. Windows is generally the preferred target for metasploitable3.

@@ -1,0 +1,52 @@
+---
+# deployment/ansible/playbooks/configure_cowrie.yml
+#
+# Post-clone configuration for the Cowrie honeypot. The golden image already has
+# Cowrie configured and the Wazuh agent installed; per deploy we only:
+#   1. tell the Wazuh agent to tail Cowrie's JSON log (localfile in ossec.conf)
+#   2. re-enroll the agent with the freshly-deployed manager
+#
+# Connection is defined by inventory. The `cowrie` host entry supplies
+# ansible_host (static IP), ansible_port: 99 (the real admin sshd — port 22 is
+# the honeypot), ansible_user, and its key. This playbook stays connection-
+# agnostic; nothing about the target is hardcoded here.
+#
+# Verify against your image:
+#   - cowrie_json_path points at the real cowrie.json location
+#   - passwordless sudo for the inventory user (become)
+
+- name: Configure Cowrie logging and enroll Wazuh agent
+  hosts: cowrie
+  become: true
+  gather_facts: false
+  vars_files:
+    - ../group_vars/wazuh.yml  
+  vars:
+    cowrie_json_path: "/home/cowrie/cowrie/var/log/cowrie/cowrie.json" 
+
+  tasks:
+    - name: Tail Cowrie's JSON log via the Wazuh agent
+      ansible.builtin.blockinfile:
+        path: /var/ossec/etc/ossec.conf
+        insertbefore: '</ossec_config>'
+        marker: "<!-- {mark} ANSIBLE MANAGED: cowrie localfile -->"
+        block: |
+          <localfile>
+            <log_format>json</log_format>
+            <location>{{ cowrie_json_path }}</location>
+          </localfile>
+
+    - name: Point the Wazuh agent at the manager
+      ansible.builtin.replace:
+        path: /var/ossec/etc/ossec.conf
+        regexp: '<address>.*</address>'
+        replace: '<address>{{ wazuh_manager_ip }}</address>'
+
+    - name: Re-enroll the agent with the (new) manager
+      ansible.builtin.command: /var/ossec/bin/agent-auth -m {{ wazuh_manager_ip }}
+      
+    - name: Restart the Wazuh agent to apply config + new key
+      ansible.builtin.service:
+        name: wazuh-agent
+        state: restarted
+        enabled: true

@@ -26,7 +26,7 @@ terraform init          # load providers and dependencies
 terraform apply         # create the LAN bridge and firewall VM
 
 cd ../../ansible
-ansible-playbook playbooks/configure_opnsense.yml --ask-vault-pass
+ansible-playbook playbooks/configure_opnsense_lan.yml --ask-vault-pass
 ```
 
 ## Stage 2 — Main (lab instances + SIEM)
@@ -37,23 +37,22 @@ Provisions the remaining VMs, configures the Wazuh stack, and enrolls agents.
 cd ../terraform/main
 terraform init
 terraform apply
-
+```
+At this point it may be prudent to open metasploitable desktop in proxmox console to verify dchp address is leased
+```
 cd ../../ansible
 ansible-playbook playbooks/make_wazuh_certs_tar.yml
 ansible-playbook playbooks/configure_wazuh_indexer.yml
 ansible-playbook playbooks/configure_wazuh_manager.yml
 ansible-playbook playbooks/configure_wazuh_dashboard.yml
 ansible-playbook playbooks/configure_pentest.yml --ask-vault-pass
-ansible-playbook playbooks/enroll_victim_agents.yml
+ansible-playbook playbooks/configure_cowrie.yml
+ansible-playbook playbooks/enroll_win2k8_agent.yml --ask-vault-pass
 ```
 
 Wazuh agent enrollment marks the end of deployment.
 
 ## Vault password
 
-Two playbooks — `configure_opnsense.yml` and `configure_attackers.yml` — read
-vault-encrypted variables and will prompt for the vault password via
-`--ask-vault-pass`.
-
-<!-- TODO: describe the vault password configuration here (how it's set / where it
-comes from). Do not commit the actual password. -->
+`--ask vault pass` signifies playbooks read from vault directories that use a shared password.
+Vault encryption & password should be configured manually during IaC controller setup.

@@ -75,16 +75,20 @@ play() {   # run an ansible playbook from the ansible dir so ansible.cfg + inven
 # ── Stage 1: Bootstrap (network + firewall) ──────────────────────────
 log "=== Stage 1: Bootstrap ==="
 terraform_apply_retry "$TF_NETWORK_INIT"
-play configure_opnsense.yml
+play configure_opnsense_lan.yml
 
 # ── Stage 2: Main (lab instances + SIEM) ─────────────────────────────
 log "=== Stage 2: Main ==="
 terraform_apply_retry "$TF_MAIN"
+
+log "=== VMs provisioned. If experiencing issues with metasploitable, log in to the desktop in the proxmox console to trigger lagging dhcp address aquisition ==="
+
 play make_wazuh_certs_tar.yml
 play configure_wazuh_indexer.yml
 play configure_wazuh_manager.yml
 play configure_wazuh_dashboard.yml
-play configure_attackers.yml
-play enroll_victim_agents.yml
+play configure_pentest.yml
+play configure_cowrie.yml
+play enroll_win2k8_agent.yml
 
 log "=== V-SOC deployment complete ==="

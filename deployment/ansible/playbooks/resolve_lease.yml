@@ -12,23 +12,18 @@
 - name: Resolve DHCP lease IP by MAC
   hosts: localhost
   gather_facts: false
+  vars_files:
+    - ../group_vars/opnsense_vault.yml
 
   vars:
     opnsense_url: "https://172.17.0.228"
-    opnsense_api_key: "{{ vault_opnsense_api_key }}"       # from the vaulted group_vars
-    opnsense_api_secret: "{{ vault_opnsense_api_secret }}"
-    target_mac: "{{ lookup('env', 'MAC') }}"              # or override with -e mac=...
-    # Field names in the dnsmasq lease schema — verify against a raw response
-    # (run with -v to dump the first row) and adjust if they differ:
+    opnsense_api_key: "{{ api_key }}"       # from the vaulted group_vars
+    opnsense_api_secret: "{{ api_secret }}"
+    target_mac: "BC:24:11:5A:F3:1E"
     mac_field: "hwaddr"
     ip_field: "address"
 
   tasks:
-    - name: Fail early if no MAC was provided
-      ansible.builtin.fail:
-        msg: "No MAC address. Export MAC or pass -e mac=<addr>."
-      when: target_mac | length == 0
-
     - name: Query dnsmasq leases
       ansible.builtin.uri:
         url: "{{ opnsense_url }}/api/dnsmasq/leases/search"
