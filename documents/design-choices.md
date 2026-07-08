@@ -6,10 +6,10 @@ tradeoffs landed where they did.
 
 ## Deployment Approach: Heavy Templates, Thin Provisioning
 
-V-SOC uses a **heavy-template, thin-provisioning** pattern. Each component —
+V-SOC uses a **heavy-template, thin-provisioning** pattern. Each component:
 OPNsense firewall, Wazuh manager-indexer, Wazuh dashboard, Suricata (running on
 OPNsense), Cowrie honeypot, Metasploitable3 target, Kali attacker boxes, and the
-pentest-gpt platform — is baked into a dedicated Proxmox golden image with all
+pentest-gpt platform, is baked into a dedicated Proxmox golden image with all
 package dependencies installed and all infrastructure-agnostic configuration
 already applied. At deployment time, Terraform clones templates into a topology
 and Ansible performs only the runtime-specific work: primarily manager IP
@@ -37,9 +37,8 @@ A second function of the image layer is worth naming, because it becomes
 relevant to the persistence discussion below. The golden image is also the
 natural home for **pre-loaded, lesson-specific state**. A component that needs
 to start with data already in place, a Wazuh manager seeded with historical
-alerts for a forensic exercise, a target already carrying a specific compromise
-— becomes a lesson-specific image derived from the base image. The same IaC
-pipeline clones it like any other. Persistence and parameterization compose in
+alerts for a forensic exercise, a target already carrying a specific compromise,
+becomes a lesson-specific image derived from the base image and configured by the insructor. The same IaC pipeline clones it like any other. Persistence and parameterization compose in
 this design rather than trading off against each other.
 
 ## Design Choice: IaC vs Snapshot-Based Provisioning
